@@ -80,7 +80,20 @@ local function refresh(player)
 	player:SetAttribute("Multiplier", Config.Multiplier(s.level, player.leaderstats.Rebirths.Value))
 end
 local function slotLabel(slot)
-	slot.text.Text = slot.rot and string.format("COLLECT $%d\n%s", math.floor(slot.bank), slot.rot.info.Name) or "EMPTY PEDESTAL\nCarry a rot here!"
+	if slot.rot then
+		slot.text.Text = string.format("COLLECT $%d\n%s", math.floor(slot.bank), slot.rot.info.Name)
+	elseif slot.reserved then
+		slot.text.Text = string.format("STOLEN! TAG THE THIEF\n$%d still safe here", math.floor(slot.bank))
+	else
+		slot.text.Text = string.format("EMPTY • BANK $%d\nCarry a rot here!", math.floor(slot.bank))
+	end
+	if slot.prompt then slot.prompt.Enabled = not slot.rot and not slot.reserved end
+end
+local function hasSpace(base)
+	for _, slot in ipairs(base.slots) do
+		if not slot.rot and not slot.reserved then return true end
+	end
+	return false
 end
 local function destroyRot(rot)
 	if rot.weld then rot.weld:Destroy() end
@@ -111,11 +124,19 @@ local function carry(player, rot, origin)
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0, weld.Part1, weld.Parent = root, rot.body, rot.body
 	rot.weld, s.carry = weld, rot
+	if origin then
+		local glow = Instance.new("Highlight")
+		glow.Name, glow.Adornee = "StolenCargo", rot.model
+		glow.FillColor, glow.OutlineColor = Color3.fromRGB(255, 80, 110), Color3.fromRGB(255, 240, 100)
+		glow.FillTransparency, glow.Parent = 0.45, rot.model
+		rot.glow = glow
+	end
 	local hum = player.Character:FindFirstChildOfClass("Humanoid")
 	if hum then hum.WalkSpeed = origin and 13 or 16 end
 	return true
 end
 local function clearCarrier(rot)
+	if rot.glow then rot.glow:Destroy(); rot.glow = nil end
 	local player = rot.carrier
 	local s = player and states[player]
 	if s then s.carry = nil end
@@ -125,7 +146,10 @@ local function clearCarrier(rot)
 end
 local function place(rot, player, slot)
 	clearCarrier(rot)
-	if rot.origin then rot.origin.reserved = nil end
+	if rot.origin then
+		rot.origin.reserved = nil
+		slotLabel(rot.origin)
+	end
 	rot.origin, rot.mode, rot.owner, rot.slot = nil, "placed", player, slot
 	slot.rot = rot
 	mount(rot, slot.pad.CFrame * CFrame.new(0, 2.8, 0), true)
@@ -198,7 +222,7 @@ for index = 1, 6 do
 		local slot = { pad = pad, bank = 0 }
 		slot.text = label(pad, "EMPTY PEDESTAL\nCarry a rot here!", Color3.new(1, 1, 1), Vector3.new(0, 5.5, 0))
 		table.insert(base.slots, slot)
-		prompt(pad, "Place", "Your empty pedestal", function(player)
+		slot.prompt = prompt(pad, "Place", "Your empty pedestal", function(player)
 			local s = states[player]
 			if base.owner ~= player or not s or not s.carry or slot.rot or slot.reserved or not near(player, pad) then return end
 			local rot, previousOwner = s.carry, s.carry.owner
@@ -258,12 +282,11 @@ local function createRot(info)
 		local s = states[player]
 		if not s or s.carry or not near(player, body) then return end
 		if rot.mode == "rail" then
-			local space = false
-			for _, slot in ipairs(s.base.slots) do if not slot.rot and not slot.reserved then space = true; break end end
-			if not space then notify(player, "Your six pedestals are full!"); return end
+			if not hasSpace(s.base) then notify(player, "Your six pedestals are full!"); return end
 			if money(player).Value < tier.Price then notify(player, "Need $" .. tier.Price .. " to buy this rot."); return end
 			if carry(player, rot, nil) then money(player).Value -= tier.Price; notify(player, "Carry it to an empty pedestal in your base!") end
 		elseif rot.mode == "placed" and rot.owner ~= player then
+			if not hasSpace(s.base) then notify(player, "You need an empty pedestal before stealing!"); return end
 			local ownerState = states[rot.owner]
 			if not ownerState then return end
 			if ownerState.base.lockedUntil > workspace:GetServerTimeNow() then notify(player, "This orbit is shielded!"); return end
@@ -331,6 +354,7 @@ local function playerAdded(player)
 	player:SetAttribute("LockReadyAt", 0)
 	refresh(player)
 	player.CharacterAdded:Connect(function(char) characterAdded(player, char) end)
+	player.CharacterRemoving:Connect(function() releaseCarry(player) end)
 	if player.Character then task.spawn(characterAdded, player, player.Character) end
 end
 Players.PlayerAdded:Connect(playerAdded)
@@ -389,12 +413,12 @@ task.spawn(function()
 end)
 task.spawn(function()
 	while true do
-		task.wait(1)
+		local elapsed = task.wait(1)
 		local now = workspace:GetServerTimeNow()
 		for player, s in pairs(states) do
 			local mult = Config.Multiplier(s.level, player.leaderstats.Rebirths.Value)
 			for _, slot in ipairs(s.base.slots) do
-				if slot.rot then slot.bank += Config.Rarities[slot.rot.info.Rarity].Income * mult end
+				if slot.rot then slot.bank += Config.Rarities[slot.rot.info.Rarity].Income * mult * elapsed end
 				slotLabel(slot)
 			end
 			if s.base.lockedUntil > 0 then

@@ -10,7 +10,7 @@ A neon space tycoon for up to six players. Buy ridiculous cosmic brainrots from 
 
 - Move with WASD / thumbstick; jump with Space / the jump button. Hold E or tap a proximity prompt to buy, place, steal, collect, or lock.
 - Start with $100. Bring a purchase to an empty pedestal in your numbered base. Walk over the green collection pad or use Collect to cash out all pedestal earnings.
-- Steal an unshielded rival's rot and place it at home. The owner can tag you to return it; dying also returns a stolen rot. Thieves move more slowly.
+- Steal an unshielded rival's rot and place it at home; you need an empty pedestal first. Stolen cargo glows, and its original pedestal stays reserved until delivery. The owner can tag you to return it; dying or resetting also returns a stolen rot. Thieves move more slowly.
 - Lock Base grants a 30-second shield with a 60-second cooldown. Its owner can pass through. HUD buttons also buy stacking income upgrades and rebirths.
 - Rebirth at $10,000 (threshold doubles each time): cash resets to $100 and income gains a permanent +50% bonus. Your characters and upgrades remain.
 - Session progress only; leaving frees your base. Purchased cargo is lost on death, so deliver it promptly.
